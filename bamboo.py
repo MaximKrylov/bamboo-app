@@ -103,6 +103,28 @@ def get_all_failed_tests(session, job_id, version):
     return results
 
 
+def get_new_failed_tests(session, job_id, version):
+    url = 'https://www.intapp.com/bamboo/rest/api/latest/result/{}-{}?expand=testResults.newFailedTests.testResult'
+    response = session.get(url.format(job_id, version), headers={
+        'Accept': 'application/json'
+    })
+    results = []
+
+    if response.status_code != 200:
+        raise Exception(response.reason)
+
+    failed_tests = response.json(
+    )['testResults']['newFailedTests']['testResult']
+
+    for test in failed_tests:
+        results.append({
+            'feature': test['className'],
+            'scenario': test['methodName']
+        })
+
+    return results
+
+
 def get_feature_specflow_path(feature):
     return re.sub('Source/Wilco.UITest/', '', feature).replace('/', '.').replace('.feature', 'Feature')
 
@@ -117,17 +139,21 @@ SESSION.auth = (LOGIN, PASSWORD)
 changes = get_changes(SESSION, PLAN, VERSION)
 jobs = get_jobs(SESSION, PLAN)
 
-all_successful_test = {}
-all_failed_test = {}
+all_successful_tests = {}
+all_failed_tests = {}
+new_failed_tests = {}
 
 job_index = 0
 
 while job_index < len(jobs):
     try:
         job = jobs[job_index]
-        all_successful_test[job['id']] = get_all_successful_tests(
+        all_successful_tests[job['id']] = get_all_successful_tests(
             SESSION, job['id'], VERSION)
-        all_failed_test[job['id']] = get_all_failed_tests(SESSION, job['id'], VERSION)
+        all_failed_tests[job['id']] = get_all_failed_tests(
+            SESSION, job['id'], VERSION)
+        new_failed_tests[job['id']] = get_new_failed_tests(
+            SESSION, job['id'], VERSION)
         print str.format('Getting SUCC/FAIL tests from {}', job['name'])
         job_index += 1
     except:
@@ -137,16 +163,29 @@ result = ''
 endl = '\r\n'
 
 for job in jobs:
-    for test in all_successful_test[job['id']]:
+    for test in all_successful_tests[job['id']]:
         result += get_printable_test('SUCCEED',
                                      job['name'], test['feature'], test['scenario']) + endl
 
-    for test in all_failed_test[job['id']]:
+    for test in all_failed_tests[job['id']]:
         result += get_printable_test('FAILED',
                                      job['name'], test['feature'], test['scenario']) + endl
 
 # --------------------------------------------
 results_file_name = 'all_results.txt'
+results_file = open(str.format("./{}", results_file_name), "wb")
+results_file.write(result.encode('UTF-8'))
+print str.format('{} has been successfully created...', results_file_name)
+# --------------------------------------------
+
+result = ''
+
+for job in jobs:
+    for test in new_failed_tests[job['id']]:
+        result += re.sub('Wilco.UITest.Spec.', '', test['feature']) + ' ' + test['scenario'] + endl
+
+# --------------------------------------------
+results_file_name = 'new_failures.txt'
 results_file = open(str.format("./{}", results_file_name), "wb")
 results_file.write(result.encode('UTF-8'))
 print str.format('{} has been successfully created...', results_file_name)
@@ -165,13 +204,13 @@ for author in changes:
         found = False
 
         for job in jobs:
-            for test in all_successful_test[job['id']]:
+            for test in all_successful_tests[job['id']]:
                 if author_feature == test['feature']:
                     found = True
                     result += get_printable_test(
                         'SUCCEED', job['name'], test['feature'], test['scenario']) + endl
 
-            for test in all_failed_test[job['id']]:
+            for test in all_failed_tests[job['id']]:
                 if author_feature == test['feature']:
                     found = True
                     result += get_printable_test(
