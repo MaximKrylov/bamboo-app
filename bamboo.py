@@ -59,7 +59,7 @@ def get_jobs(session, plan):
     return results
 
 
-def get_successful_tests(session, job_id, version):
+def get_all_successful_tests(session, job_id, version):
     url = 'https://www.intapp.com/bamboo/rest/api/latest/result/{}-{}?expand=testResults.successfulTests.testResult'
     response = session.get(url.format(job_id, version), headers={
         'Accept': 'application/json'
@@ -81,7 +81,7 @@ def get_successful_tests(session, job_id, version):
     return results
 
 
-def get_failed_tests(session, job_id, version):
+def get_all_failed_tests(session, job_id, version):
     url = 'https://www.intapp.com/bamboo/rest/api/latest/result/{}-{}?expand=testResults.failedTests.testResult'
     response = session.get(url.format(job_id, version), headers={
         'Accept': 'application/json'
@@ -117,17 +117,17 @@ SESSION.auth = (LOGIN, PASSWORD)
 changes = get_changes(SESSION, PLAN, VERSION)
 jobs = get_jobs(SESSION, PLAN)
 
-succeed_tests = {}
-failed_tests = {}
+all_successful_test = {}
+all_failed_test = {}
 
 job_index = 0
 
 while job_index < len(jobs):
     try:
         job = jobs[job_index]
-        succeed_tests[job['id']] = get_successful_tests(
+        all_successful_test[job['id']] = get_all_successful_tests(
             SESSION, job['id'], VERSION)
-        failed_tests[job['id']] = get_failed_tests(SESSION, job['id'], VERSION)
+        all_failed_test[job['id']] = get_all_failed_tests(SESSION, job['id'], VERSION)
         print str.format('Getting SUCC/FAIL tests from {}', job['name'])
         job_index += 1
     except:
@@ -137,11 +137,11 @@ result = ''
 endl = '\r\n'
 
 for job in jobs:
-    for test in succeed_tests[job['id']]:
+    for test in all_successful_test[job['id']]:
         result += get_printable_test('SUCCEED',
                                      job['name'], test['feature'], test['scenario']) + endl
 
-    for test in failed_tests[job['id']]:
+    for test in all_failed_test[job['id']]:
         result += get_printable_test('FAILED',
                                      job['name'], test['feature'], test['scenario']) + endl
 
@@ -165,13 +165,13 @@ for author in changes:
         found = False
 
         for job in jobs:
-            for test in succeed_tests[job['id']]:
+            for test in all_successful_test[job['id']]:
                 if author_feature == test['feature']:
                     found = True
                     result += get_printable_test(
                         'SUCCEED', job['name'], test['feature'], test['scenario']) + endl
 
-            for test in failed_tests[job['id']]:
+            for test in all_failed_test[job['id']]:
                 if author_feature == test['feature']:
                     found = True
                     result += get_printable_test(
