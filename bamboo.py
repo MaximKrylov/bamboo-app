@@ -5,7 +5,7 @@ import requests
 # ------------ Information ---------------
 LOGIN = ''  # login
 PASSWORD = ''  # password
-PLAN = 'CLOUD-GUTOC50'  # uitests
+PLAN = 'CLOUD-UTOIC42'  # uitests
 VERSION = 'latest'  # running version
 # ----------------------------------------
 
@@ -136,7 +136,11 @@ def get_printable_test(status, job, feature, scenario):
 SESSION = requests.Session()
 SESSION.auth = (LOGIN, PASSWORD)
 
+# ---------------------------------------------
+# GETTING CHANGES
 changes = get_changes(SESSION, PLAN, VERSION)
+# ---------------------------------------------
+
 jobs = get_jobs(SESSION, PLAN)
 
 all_successful_tests = {}
@@ -148,12 +152,16 @@ job_index = 0
 while job_index < len(jobs):
     try:
         job = jobs[job_index]
-        all_successful_tests[job['id']] = get_all_successful_tests(
-            SESSION, job['id'], VERSION)
-        all_failed_tests[job['id']] = get_all_failed_tests(
-            SESSION, job['id'], VERSION)
-        new_failed_tests[job['id']] = get_new_failed_tests(
-            SESSION, job['id'], VERSION)
+
+        # -------------------------------------------------------------------------------------
+        # GETTING SUCCESSFUL TESTS
+        all_successful_tests[job['id']] = get_all_successful_tests(SESSION, job['id'], VERSION)
+        # GETTING ALL FAILED TESTS
+        all_failed_tests[job['id']] = get_all_failed_tests(SESSION, job['id'], VERSION)
+        # GETTING NEW FAILED TESTS
+        new_failed_tests[job['id']] = get_new_failed_tests(SESSION, job['id'], VERSION)
+        # -------------------------------------------------------------------------------------
+
         print str.format('Getting SUCC/FAIL tests from {}', job['name'])
         job_index += 1
     except:
