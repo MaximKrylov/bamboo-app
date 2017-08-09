@@ -8,35 +8,36 @@ PASSWORD = ''  # password
 PLAN = 'CLOUD-UTOIC42'  # uitests
 VERSION = 'latest'  # running version
 # ----------------------------------------
+VERSION_FOR_CHANGES = "17,18,19,20,21"
 
-
-def get_changes(session, plan, version):
-    url = 'https://www.intapp.com/bamboo/rest/api/latest/result/{}-{}?expand=changes.change.files'
-    response = session.get(url.format(plan, version), headers={
-        'Accept': 'application/json'
-    })
+def get_changes(session, plan, versions):
     results = {}
 
-    if response.status_code != 200:
-        raise Exception(response.reason)
+    for version in versions.split(","):
+        url = 'https://www.intapp.com/bamboo/rest/api/latest/result/{}-{}?expand=changes.change.files'
+        response = session.get(url.format(plan, version), headers={
+            'Accept': 'application/json'
+        })
 
-    changes = response.json()['changes']['change']
+        if response.status_code != 200:
+            raise Exception(response.reason)
 
-    for change in changes:
-        author = re.search(r'<(.+)>', change['author']).group(0)
+        changes = response.json()['changes']['change']
 
-        for item in change['files']['file']:
-            if '.feature' in item['name']:
-                feature = item['name']
-                if author in results:
-                    if feature in results[author]:
-                        continue
-                    results[author].append(feature)
-                else:
-                    results[author] = [feature]
+        for change in changes:
+            author = re.search(r'<(.+)>', change['author']).group(0)
+
+            for item in change['files']['file']:
+                if '.feature' in item['name']:
+                    feature = item['name']
+                    if author in results:
+                        if feature in results[author]:
+                            continue
+                        results[author].append(feature)
+                    else:
+                        results[author] = [feature]
 
     return results
-
 
 def get_jobs(session, plan):
     url = 'https://www.intapp.com/bamboo/rest/api/latest/search/jobs/{}?max-result=100'
@@ -82,7 +83,7 @@ def get_all_successful_tests(session, job_id, version):
 
 
 def get_all_failed_tests(session, job_id, version):
-    url = 'https://www.intapp.com/bamboo/rest/api/latest/result/{}-{}?expand=testResults.failedTests.testResult'
+    url = 'https://www.intapp.com/bamboo/rest/api/latest/result/{}-{}?expand=testResults.failedTests.testResult.errors'
     response = session.get(url.format(job_id, version), headers={
         'Accept': 'application/json'
     })
@@ -203,9 +204,8 @@ print str.format('{} has been successfully created...', results_file_name)
 result = ''
 
 for author in changes:
-    result += author + endl
     feature_index = 0
-
+    result += author + endl
     while feature_index < len(changes[author]):
         author_feature = get_feature_specflow_path(
             changes[author][feature_index])
@@ -215,14 +215,19 @@ for author in changes:
             for test in all_successful_tests[job['id']]:
                 if author_feature == test['feature']:
                     found = True
-                    result += get_printable_test(
+                    result += author + "\t" + get_printable_test(
                         'SUCCEED', job['name'], test['feature'], test['scenario']) + endl
 
             for test in all_failed_tests[job['id']]:
                 if author_feature == test['feature']:
                     found = True
-                    result += get_printable_test(
-                        'FAILED', job['name'], test['feature'], test['scenario']) + endl
+                    print(test)
+                    error = ""
+#                    if len(test['errors']['error']) != 0:
+#                        error = test['errors']['error'][0]
+
+                    result += author + "\t" + get_printable_test(
+                        'FAILED', job['name'], test['feature'], test['scenario']) + error + endl
 
         if found:
             del changes[author][feature_index]
@@ -231,7 +236,7 @@ for author in changes:
 
     if len(changes[author]) > 0:
         for feature in changes[author]:
-            result += 'NOT FOUND' + '\t' + feature + endl
+            result +=author + "\t" + 'NOT FOUND' + '\t' + feature + endl
 
 # --------------------------------------------
 results_file_name = 'last_results.txt'
